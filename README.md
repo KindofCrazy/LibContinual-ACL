@@ -9,6 +9,7 @@ Files need to be modified:
 
 ## 代码环境
 我所使用的`conda`环境见 [njubox](https://box.nju.edu.cn/d/1acf2a8440c94731a9ab/) 。
+
 **Note**:与`LibContinual`与`ACL`的文档中要求有所不同，为了能在`A800`上运行改变了`torch`,`torchvision`,`cuDNN`的版本。
 
 - Python: 3.8.0
