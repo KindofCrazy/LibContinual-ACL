@@ -20,6 +20,7 @@ In `acl.py`, we define the model `ACL` as follows:
 
 ## 配置文件
 [LibContinualDocs](https://libcontinual.readthedocs.io/en/latest/docs/config_file_en.html)
+
 In `acl.yaml`, we set the configuration for the model `ACL` as follows:
 - [ ] Dataset：所用数据集
 - [ ] Optimizer：训练的优化器与学习率调度器信息
