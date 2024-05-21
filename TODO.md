@@ -32,14 +32,19 @@ Files need to be modified:
 
 ## Model
 `backbone` : `Shared(AlexNet) + Private(AlexNet)` 
+
 `classifier(head)` : `3-layer perceptron` 
+
 `discriminator` : `3-layer perceptron`
+
 `buffer` : **???**
 
 **考虑暂时舍弃`backbone`等相关操作**。因为在`ACL`中，`backbone` 中的`Private` 模块对于不同任务需要进行更换，`head` 也需要对于不同任务进行更换，不符合。或者将 `AlexNet` 等作为`backbone` ，然后在`Model`在里面进行组合手动记录`task_id`并设置模块的更换。（`Shared`和`Private`的`AlexNet`结构本身会有差别）
 
 In `acl.py`, we define the model `ACL` as follows:
-- [ ] `class Model(nn.Module)` ![](./resources/imgs/acl.png) 记录 `self.task_id` 
+- [ ] `class Model(nn.Module)` ![](./resources/imgs/acl.png) 
+
+    + 记录 `self.task_id` 
 	- [ ] `Shared`
 	- [ ] `Private`
 	- [ ] `head` 
