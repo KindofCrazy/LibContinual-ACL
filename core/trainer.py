@@ -224,13 +224,7 @@ class Trainer(object):
             self.buffer.total_classes += self.init_cls_num if task_idx == 0 else self.inc_cls_num
             if hasattr(self.model, 'before_task'):
                 self.model.before_task(task_idx, self.buffer, self.train_loader.get_loader(task_idx), self.test_loader.get_loader(task_idx))
-            
-            (
-                _, __,
-                self.optimizer,
-                self.scheduler,
-            ) = self._init_optim(self.config)
-                
+
             dataloader = self.train_loader.get_loader(task_idx)
 
             if isinstance(self.buffer, (LinearBuffer, LinearHerdingBuffer)) and task_idx != 0:
@@ -418,6 +412,3 @@ class Trainer(object):
                 per_task_acc.append(round(meter.avg("acc1"), 2))
         
         return {"avg_acc" : round(total_meter.avg("acc1"), 2), "per_task_acc" : per_task_acc}
-    
-
-

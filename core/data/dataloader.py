@@ -1,3 +1,4 @@
+from flask import Config
 from torchvision import transforms
 # from .augments import *
 import os
@@ -25,7 +26,6 @@ def get_augment(config, mode='train'):
         d['backbone'] = 'vit'
         
     return transform_classes[d['dataset']].get_transform(d['backbone'], d['mode'])
-    
 
 def get_dataloader(config, mode, cls_map=None):
     '''
@@ -33,7 +33,7 @@ def get_dataloader(config, mode, cls_map=None):
 
     Args:
         config (dict): Parsed config dict.
-        mode (string): 'trian' or 'test'.
+        mode (string): 'train' or 'test'.
         cls_map (dict): record the map between class and labels.
     
     Returns:
@@ -60,9 +60,3 @@ def get_dataloader(config, mode, cls_map=None):
             cls_map[label] = cls_list[ori_label]
 
     return ContinualDatasets(mode, task_num, init_cls_num, inc_cls_num, data_root, cls_map, trfms, config['batch_size'])
-
-
-
-
-    
-    

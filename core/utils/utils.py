@@ -186,3 +186,4 @@ def fmt_date_str(date=None, fmt="%y-%m-%d-%H-%M-%S"):
     if date is None:
         date = datetime.now()
     return date.strftime(fmt)
+

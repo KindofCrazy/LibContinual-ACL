@@ -22,7 +22,7 @@ class ContinualDatasets:
     def create_loaders(self):
         for i in range(self.task_num):
             start_idx = 0 if i == 0 else (self.init_cls_num + (i-1) * self.inc_cls_num)
-            end_idx = start_idx + (self.init_cls_num if i ==0 else self.inc_cls_num)
+            end_idx = start_idx + (self.init_cls_num if i == 0 else self.inc_cls_num)
             self.dataloaders.append(DataLoader(
                 SingleDataseat(self.data_root, self.mode, self.cls_map, start_idx, end_idx, self.trfms),
                 shuffle = True,
@@ -36,10 +36,8 @@ class ContinualDatasets:
             return self.dataloaders[task_idx]
         else:
             return self.dataloaders[:task_idx+1]
-        
 
 
-    
 class SingleDataseat(Dataset):
     def __init__(self, data_root, mode, cls_map, start_idx, end_idx, trfms):
         super().__init__()
@@ -72,8 +70,6 @@ class SingleDataseat(Dataset):
         
         return imgs, labels
         # return np.array(imgs), np.array(labels)
-
-    
 
 class BatchData(Dataset):
     def __init__(self, images, labels, input_transform=None):
@@ -157,3 +153,4 @@ class Exemplar:
 
     def get_cur_cls(self):
         return self.cur_cls
+
