@@ -89,3 +89,4 @@ for epoch in range(self.config['num_epochs']):
 
 
 - acl 中dataset是怎么划分的，每个task是怎么划分的。代码里好像看到不同任务的样本混到一起了，这样训练discriminator也许更合理。
+- load/save_model 要进行实现 (checkpoint)
