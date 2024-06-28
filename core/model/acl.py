@@ -464,7 +464,10 @@ class ACL(Finetune):
                     self.patience_d_epoch=self.lr_patience
                     self.optimizer_D=self.get_D_optimizer(task_id, self.d_lr_epoch)
             print()
-
+    
+    def inference(self, data):
+        # TODO 考虑如何实现 inference，返回 output, acc
+        pass
 
     def eval_(self, dataloader, task_id):
         loss_a, loss_t, loss_d, loss_total=0, 0, 0, 0

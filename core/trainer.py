@@ -243,7 +243,7 @@ class Trainer(object):
 
     def _validate(self, task_idx):
         # TODO 重新加载对应 `task_id` 对应模型参数，并进行`Shared` 的替换，再用该模型对该任务进行`inference`。
-
+        # TODO 更换为 `ACL/acl.py/test()`
         dataloaders = self.test_loader.get_loader(task_idx)
 
         self.model.eval()

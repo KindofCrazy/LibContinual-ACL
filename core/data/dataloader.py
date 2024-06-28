@@ -55,7 +55,7 @@ def get_dataloader(config, mode, cls_map=None):
     # TODO tt 与 td 是否需要加入
     if cls_map is None:
         cls_list = os.listdir(os.path.join(data_root, mode))
-        perm = np.random.permutation(len(cls_list))
+        perm = tnp.random.permutation(len(cls_lis))
         cls_map = dict()
         for label, ori_label in enumerate(perm):
             cls_map[label] = cls_list[ori_label]
