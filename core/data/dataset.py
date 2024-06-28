@@ -1,3 +1,4 @@
+from math import e
 from torch.utils.data import Dataset
 import PIL
 import numpy as np
@@ -24,7 +25,7 @@ class ContinualDatasets:
             start_idx = 0 if i == 0 else (self.init_cls_num + (i-1) * self.inc_cls_num)
             end_idx = start_idx + (self.init_cls_num if i == 0 else self.inc_cls_num)
             self.dataloaders.append(DataLoader(
-                SingleDataseat(self.data_root, self.mode, self.cls_map, start_idx, end_idx, self.trfms),
+                SingleDataseat(self.data_root, self.mode, self.cls_map, start_idx, end_idx, self.trfms, i),
                 shuffle = True,
                 batch_size = self.batchsize,
                 drop_last = False
@@ -39,7 +40,7 @@ class ContinualDatasets:
 
 
 class SingleDataseat(Dataset):
-    def __init__(self, data_root, mode, cls_map, start_idx, end_idx, trfms):
+    def __init__(self, data_root, mode, cls_map, start_idx, end_idx, trfms, task_id):
         super().__init__()
         self.data_root = data_root
         self.mode = mode
@@ -47,6 +48,7 @@ class SingleDataseat(Dataset):
         self.start_idx = start_idx
         self.end_idx = end_idx
         self.trfms = trfms
+        self.task_id = task_id
 
         self.images, self.labels = self._init_datalist()
 
@@ -55,18 +57,21 @@ class SingleDataseat(Dataset):
         label = self.labels[idx]
         image = PIL.Image.open(os.path.join(self.data_root, self.mode, img_path)).convert("RGB")
         image = self.trfms(image)
-        return {"image": image, "label": label}
+        # TODO tt, td
+        return {"image": image, "label": label, "tt": self.task_id, "td": self.task_id + 1}
     
     def __len__(self,):
         return len(self.labels)
 
     def _init_datalist(self):
         imgs, labels = [], []
+        classes_id = range(self.start_idx, self.end_idx)
+        universe_cls_map = {c: i for i, c in enumerate(classes_id)}
         for id in range(self.start_idx, self.end_idx):
             # print(id, self.cls_map[id])
             img_list = [self.cls_map[id] + '/' + pic_path for pic_path in os.listdir(os.path.join(self.data_root, self.mode, self.cls_map[id]))]
             imgs.extend(img_list)
-            labels.extend([id for _ in range(len(img_list))])
+            labels.extend([universe_cls_map[id] for _ in range(len(img_list))])
         
         return imgs, labels
         # return np.array(imgs), np.array(labels)

@@ -19,12 +19,12 @@ def get_augment(config, mode='train'):
          'backbone': 'resnet',
          'mode': mode}
     
-    if 'dataset' in config.keys():
-        d['dataset'] = config['dataset']
-    if 'vit' in config['backbone']['name'].lower():
-        d['backbone'] = 'vit'
-        
-    return transform_classes[d['dataset']].get_transform(d['backbone'], d['mode'])
+    # if 'dataset' in config.keys():
+    #     d['dataset'] = config['dataset']
+    # if 'vit' in config['backbone']['name'].lower():
+    #     d['backbone'] = 'vit'
+    # TODO 删除 backbone 相关操作
+    return transform_classes[d['dataset']].get_transform(d['mode'])
 
 def get_dataloader(config, mode, cls_map=None):
     '''
@@ -45,6 +45,7 @@ def get_dataloader(config, mode, cls_map=None):
 
     data_root = config['data_root']
 
+    
     trfms = get_augment(config, mode)
     # trfms = get_augment_method(config, mode)
     # trfms_list.append(transforms.ToTensor())
@@ -55,7 +56,7 @@ def get_dataloader(config, mode, cls_map=None):
     # TODO tt 与 td 是否需要加入
     if cls_map is None:
         cls_list = os.listdir(os.path.join(data_root, mode))
-        perm = tnp.random.permutation(len(cls_lis))
+        perm = np.random.permutation(len(cls_list))
         cls_map = dict()
         for label, ori_label in enumerate(perm):
             cls_map[label] = cls_list[ori_label]

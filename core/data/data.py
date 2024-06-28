@@ -48,6 +48,20 @@ class CIFARTransform:
         else:
             raise ValueError("Unsupported model type")
     
+    @staticmethod
+    def get_transform(mode):
+        mean=[x/255 for x in [125.3,123.0,113.9]]
+        std=[x/255 for x in [63.0,62.1,66.7]]
+
+        transformation = transforms.Compose([transforms.ToTensor(), transforms.Normalize(mean, std)])
+
+        if mode == 'train':
+            return transformation
+        elif mode == 'test':
+            return transformation
+        else:
+            raise ValueError("Unsupported mode")
+    
     
 class ImageNetTransform:
     MEAN=[0.4914, 0.4822, 0.4465]
