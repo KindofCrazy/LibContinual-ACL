@@ -93,11 +93,11 @@ for epoch in range(self.config['num_epochs']):
    - [x] 关于训练集里的 `tt` 与 `td` 含义是什么。如何（是否需要）修改 `LibContinual` 中的`dataset/dataloader` 使之加入`tt` 与 `td` 。 ✅ 2024-06-28
    - [x] 关于 数据的 `label` ：`ACL` 与 `LibContinual` 中在训练每个任务时 `label` 的定义是否相同？如：是否在训练 `CIFARAR100` 时将其分为20个任务：两者在训练每个任务中`label` 是 `0-5` 还是 `0-20(其中5个)` ✅ 2024-06-28
    - [x] `transform` 相关改变 ✅ 2024-06-28
-1. `load/save_model` 相关：
+2. `load/save_model` 相关：
    - [ ] `core/model/acl.py` ：`acl.after_task` 保存与加载模型`acl.after_epoch` 保存与加载模型
   - [ ]  `core/trainer.py` ：
     `trainer._validate` 需要加载模型  
     `__init__model()` 需要初始化模型，需要进行改写
- 
+ 3. `acl.yaml` 需要与模型匹配
 
 
