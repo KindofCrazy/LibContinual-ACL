@@ -164,7 +164,7 @@ class Trainer(object):
 
         return train_loaders, test_loaders
 
-    # TODO 每一个任务要训练 self.epochs 遍，每一遍都要调用 self._train() 方法
+    # 每一个任务要训练 self.epochs 遍，每一遍都要调用 self._train() 方法
     def train_loop(self,):
         """
         The norm train loop:  before_task, train, test, after_task
@@ -223,7 +223,7 @@ class Trainer(object):
         Returns:
             dict:  {"avg_acc": float}
         """
-        # TODO 每个`epoch`训练。在 `model.observe()` 内部进行参数更新，仅返回损失与准确率。
+        # 每个`epoch`训练。在 `model.observe()` 内部进行参数更新，仅返回损失与准确率。
         self.model.train()
         self.discriminator.train()
         meter = deepcopy(self.train_meter)

@@ -126,7 +126,7 @@ class Model(nn.Module):
         private_out = self.private(x_p, task_id)
         out = torch.cat([private_out, shared_out], dim=1)
         # 用不同任务的 head 对相应任务的输出进行分类
-        # TODO 这里的 tt 是什么？好像是每个样本对应的任务编号，需要进一步确定。如果是，那么这里 tt 应该可以去掉，直接用 task_id 标识head编号
+        # TODO 这里的 tt 是什么？
         return torch.stack([self.head[tt[i]].forward(out[i]) for i in range(out.size(0))])
     
     def get_encoded_ftrs(self, x_s, x_p, task_id):
@@ -210,7 +210,7 @@ class GradientReversal(torch.nn.Module):
 # kwargs=config["classifier"]["kwargs"]
 class ACL(Finetune):
     # 舍弃 backbone 操作
-    # TODO feat_dim 考虑要不要舍弃算了
+    # feat_dim 舍弃算了，注意调用时此处为None
     def __init__(self, feat_dim, num_class, **kwargs):
         self.kwargs = kwargs
         self.npochs = kwargs['npochs']
@@ -304,6 +304,7 @@ class ACL(Finetune):
 
     def observe(self, data):
         # TODO 面对一个batch的数据，需要进行对抗训练。Train Shared Module and Train Discriminator
+        # TODO `tt` 与 `td` 是什么？需要进一步确定
         x, y, tt, td = data['image'], data['label'], data['tt'], data['td']
         x.to(self.device)
         y.to(self.device, dtype=torch.long)
@@ -420,7 +421,7 @@ class ACL(Finetune):
 
                 self.discriminator=self.get_discriminator(task_id)
 
-                # TODO 
+                # TODO load model
                 # if task_id > 0:
                 #     self.model=self.load_checkpoint(task_id - 1)
                 # else:

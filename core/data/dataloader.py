@@ -51,7 +51,8 @@ def get_dataloader(config, mode, cls_map=None):
     # trfms_list.append(transforms.Normalize(mean=MEAN, std=STD))
     # trfms = transforms.Compose(trfms_list)
 
-    # TODO [!需要确定] clsmap 应该要改，每一个任务对应的分类标签应该都是[0,1,2,3,4]的
+    # TODO [!需要确定] clsmap 应该要改，每一个任务对应的分类标签应该都是[0,1,2,3,4]的?
+    # TODO tt 与 td 是否需要加入
     if cls_map is None:
         cls_list = os.listdir(os.path.join(data_root, mode))
         perm = np.random.permutation(len(cls_list))
