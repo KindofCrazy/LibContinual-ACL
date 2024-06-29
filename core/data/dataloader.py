@@ -23,7 +23,7 @@ def get_augment(config, mode='train'):
     #     d['dataset'] = config['dataset']
     # if 'vit' in config['backbone']['name'].lower():
     #     d['backbone'] = 'vit'
-    # TODO 删除 backbone 相关操作
+    # 删除 backbone 相关操作
     return transform_classes[d['dataset']].get_transform(d['mode'])
 
 def get_dataloader(config, mode, cls_map=None):
@@ -52,8 +52,8 @@ def get_dataloader(config, mode, cls_map=None):
     # trfms_list.append(transforms.Normalize(mean=MEAN, std=STD))
     # trfms = transforms.Compose(trfms_list)
 
-    # TODO [!需要确定] clsmap 应该要改，每一个任务对应的分类标签应该都是[0,1,2,3,4]的?
-    # TODO tt 与 td 是否需要加入
+    # clsmap 应该要改，每一个任务对应的分类标签应该都是[0,1,2,3,4]的?
+    # tt 与 td 需要加入
     if cls_map is None:
         cls_list = os.listdir(os.path.join(data_root, mode))
         perm = np.random.permutation(len(cls_list))

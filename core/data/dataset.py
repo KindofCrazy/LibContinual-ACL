@@ -57,7 +57,7 @@ class SingleDataseat(Dataset):
         label = self.labels[idx]
         image = PIL.Image.open(os.path.join(self.data_root, self.mode, img_path)).convert("RGB")
         image = self.trfms(image)
-        # TODO tt, td
+        # 加入 tt, td
         return {"image": image, "label": label, "tt": self.task_id, "td": self.task_id + 1}
     
     def __len__(self,):

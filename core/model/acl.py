@@ -1,5 +1,7 @@
 import imp
+import os
 import random
+from tabnanny import check
 from cv2 import threshold
 import torch
 import torch.nn as nn
@@ -126,11 +128,14 @@ class Model(nn.Module):
         private_out = self.private(x_p, task_id)
         out = torch.cat([private_out, shared_out], dim=1)
         # 用不同任务的 head 对相应任务的输出进行分类
-        # TODO 这里的 tt 是什么？
+        # 这里的 tt 是该数据对应的 task_id
         return torch.stack([self.head[tt[i]].forward(out[i]) for i in range(out.size(0))])
     
     def get_encoded_ftrs(self, x_s, x_p, task_id):
         return self.shared(x_s), self.private(x_p, task_id)
+    
+    def get_parameters(self, config):
+        return self.parameters()
 
 
 # kwargs=config["classifier"]["kwargs"]
@@ -231,9 +236,8 @@ class ACL(Finetune):
 
         # self.samples=args.samples
 
-
         self.device=kwargs["device"]
-        # self.checkpoint=args.checkpoint
+        self.checkpoint=kwargs["checkpoint"]
 
 
         self.adv_loss_reg=kwargs["adv"]
@@ -249,6 +253,7 @@ class ACL(Finetune):
         self.num_tasks=kwargs["ntasks"]
 
         # Initialize generator and discriminator
+        self.model = Model(kwargs['ntasks'], num_class, kwargs['inputsize'], kwargs['latent_dim'], kwargs['head_units']).to(kwargs['device'])
         self.discriminator=self.get_discriminator(0)
         self.discriminator.get_size()
 
@@ -284,14 +289,17 @@ class ACL(Finetune):
         return optimizer_D
 
     def before_task(self, task_id, buffer, train_loader, test_loaders):
+        if task_id > 0:
+            self.model=self.prepare_model(task_id)
+
         self.task_id = task_id
         self.discriminator = self.get_discriminator(task_id)
 
         self.best_loss=np.inf
-        self.best_model=get_model(self.model)
+        self.best_model=self.get_model(self.model)
 
         self.best_loss_d=np.inf
-        self.best_model_d=get_model(self.discriminator)
+        self.best_model_d=self.get_model(self.discriminator)
 
         self.dis_lr_update=True
         self.d_lr_epoch=self.d_lr[task_id]
@@ -303,12 +311,15 @@ class ACL(Finetune):
         self.optimizer_S=self.get_S_optimizer(task_id, self.e_lr_epoch)
 
     def observe(self, data):
-        # TODO 面对一个batch的数据，需要进行对抗训练。Train Shared Module and Train Discriminator
-        # TODO `tt` 与 `td` 是什么？需要进一步确定
+        # 面对一个batch的数据，需要进行对抗训练。Train Shared Module and Train Discriminator
+        # `tt` 与 `td` 的意义
+        self.model.train()
+        self.discriminator.train()
+
         x, y, tt, td = data['image'], data['label'], data['tt'], data['td']
         x.to(self.device)
         y.to(self.device, dtype=torch.long)
-        x_task_module = x.clone().to(self.device)
+        tt=tt.to(self.device)
         
         # Detaching samples in the batch which do not belong to the current task before feeding them to P
         t_current=self.task_id * torch.ones_like(tt)
@@ -324,8 +335,12 @@ class ACL(Finetune):
         t_real_D=td.to(self.device)
         t_fake_D=torch.zeros_like(t_real_D).to(self.device)
 
+
+        # ================================================================== #
+        #                        Train Shared Module                          #
+        # ================================================================== #
+        # training S for s_steps
         for s_step in range(self.s_steps):
-            # Train Shared Module
             self.optimizer_S.zero_grad()
             self.model.zero_grad()
 
@@ -347,62 +362,67 @@ class ACL(Finetune):
 
             self.optimizer_S.step()
 
-            # Train Discriminator
-            # training discriminator for d_steps
-            for d_step in range(self.d_steps):
-                self.optimizer_D.zero_grad()
-                self.discriminator.zero_grad()
+        # ================================================================== #
+        #                          Train Discriminator                       #
+        # ================================================================== #
+        # training discriminator for d_steps
+        for d_step in range(self.d_steps):
+            self.optimizer_D.zero_grad()
+            self.discriminator.zero_grad()
 
-                # training discriminator on real data
-                output=self.model(x, x_task_module, tt, self.task_id)
-                shared_encoded, task_out=self.model.get_encoded_ftrs(x, x_task_module, self.task_id)
-                dis_real_out=self.discriminator.forward(shared_encoded.detach(), t_real_D, self.task_id)
-                dis_real_loss=self.adversarial_loss_d(dis_real_out, t_real_D)
-                if self.args.experiment == 'miniimagenet':
-                    dis_real_loss*=self.adv_loss_reg
-                dis_real_loss.backward(retain_graph=True)
+            # training discriminator on real data
+            output=self.model(x, x_task_module, tt, self.task_id)
+            shared_encoded, task_out=self.model.get_encoded_ftrs(x, x_task_module, self.task_id)
+            dis_real_out=self.discriminator.forward(shared_encoded.detach(), t_real_D, self.task_id)
+            dis_real_loss=self.adversarial_loss_d(dis_real_out, t_real_D)
+            if self.args.experiment == 'miniimagenet':
+                dis_real_loss*=self.adv_loss_reg
+            dis_real_loss.backward(retain_graph=True)
 
-                # training discriminator on fake data
-                z_fake=torch.as_tensor(np.random.normal(self.mu, self.sigma, (x.size(0), self.latent_dim)),dtype=torch.float32, device=self.device)
-                dis_fake_out=self.discriminator.forward(z_fake, t_real_D, self.task_id)
-                dis_fake_loss=self.adversarial_loss_d(dis_fake_out, t_fake_D)
-                if self.args.experiment == 'miniimagenet':
-                    dis_fake_loss*=self.adv_loss_reg
-                dis_fake_loss.backward(retain_graph=True)
+            # training discriminator on fake data
+            z_fake=torch.as_tensor(np.random.normal(self.mu, self.sigma, (x.size(0), self.latent_dim)),dtype=torch.float32, device=self.device)
+            dis_fake_out=self.discriminator.forward(z_fake, t_real_D, self.task_id)
+            dis_fake_loss=self.adversarial_loss_d(dis_fake_out, t_fake_D)
+            if self.args.experiment == 'miniimagenet':
+                dis_fake_loss*=self.adv_loss_reg
+            dis_fake_loss.backward(retain_graph=True)
 
-                self.optimizer_D.step()
+            self.optimizer_D.step()    
 
         # 以下是要返回的 output, total_loss, acc
-        output = self.model(x, x, tt, self.task_id)
-        
-        task_loss = self.task_loss(output, y)
-        shared_encoded, task_encoded=self.model.get_encoded_ftrs(x, x_task_module, self.task_id)
-        dis_out_gen_training=self.discriminator(shared_encoded, y, self.task_id)
-        adv_loss=self.adversarial_loss_s(dis_out_gen_training, y)
-        if self.diff=="yes":
-            diff_loss=self.diff_loss(shared_encoded, task_encoded)
-        else:
-            diff_loss=torch.tensor(0).to(device=self.device, dtype=torch.float32)
-            self.diff_loss_reg=0
-        total_loss=task_loss + self.adv_loss_reg * adv_loss + self.diff_loss_reg * diff_loss
-        
-        _, pred=output.max(1)
-        acc = pred.eq(y.view_as(pred)).sum().item() / y.size(0)
+        self.model.eval()
+        self.discriminator.eval()
+        with torch.no_grad():
+            output = self.model(x, x, tt, self.task_id)
+            
+            task_loss = self.task_loss(output, y)
+            shared_encoded, task_encoded=self.model.get_encoded_ftrs(x, x_task_module, self.task_id)
+            dis_out_gen_training=self.discriminator(shared_encoded, y, self.task_id)
+            adv_loss=self.adversarial_loss_s(dis_out_gen_training, y)
+            if self.diff=="yes":
+                diff_loss=self.diff_loss(shared_encoded, task_encoded)
+            else:
+                diff_loss=torch.tensor(0).to(device=self.device, dtype=torch.float32)
+                self.diff_loss_reg=0
+            total_loss=task_loss + self.adv_loss_reg * adv_loss + self.diff_loss_reg * diff_loss
+            
+            _, pred=output.max(1)
+            acc = pred.eq(y.view_as(pred)).sum().item() / y.size(0)
 
         return output, total_loss, acc
 
     def after_task(self, task_id, buffer, train_loader, test_loaders):
-        # TODO 保存模型
+        # 保存模型
         # Restore best validation model (early-stopping)
         self.model.load_state_dict(copy.deepcopy(self.best_model))
         self.discriminator.load_state_dict(copy.deepcopy(self.best_model_d))
 
-        # TODO 看要怎么实现 save 和 load 相关操作
+        # 看要怎么实现 save 和 load 相关操作
         self.save_all_models(task_id)
 
     def after_epoch(self, task_id, epoch_id, train_loader, test_loader):
         train_res=self.eval_(train_loader, task_id)
-        report_tr(train_res, epoch_id, self.sbatch)
+        self.report_tr(train_res, epoch_id, self.sbatch)
 
         # lowering the learning rate in the beginning if it predicts random chance for the first 5 epochs
         if epoch_id == 4:
@@ -421,53 +441,71 @@ class ACL(Finetune):
 
                 self.discriminator=self.get_discriminator(task_id)
 
-                # TODO load model
-                # if task_id > 0:
-                #     self.model=self.load_checkpoint(task_id - 1)
-                # else:
-                #     self.model=self.network.Net(self.args).to(self.args.device)
+                # load model
+                if task_id > 0:
+                    self.model=self.load_checkpoint(task_id - 1)
+                else:
+                    self.model=Model(self.kwargs['ntasks'], self.kwargs['num_class'], self.kwargs['inputsize'], self.kwargs['latent_dim'], self.kwargs['head_units']).to(self.kwargs['device'])
 
 
-            # Valid
-            valid_res=self.eval_(test_loader, task_id)
-            report_val(valid_res)
+        # Valid
+        valid_res=self.eval_(test_loader, task_id)
+        self.report_val(valid_res)
 
-            # Adapt lr for S and D
-            if valid_res['loss_tot'] < self.best_loss:
-                self.best_loss=valid_res['loss_tot']
-                self.best_model=get_model(self.model)
+        # Adapt lr for S and D
+        if valid_res['loss_tot'] < self.best_loss:
+            self.best_loss=valid_res['loss_tot']
+            self.best_model=self.get_model(self.model)
+            self.patience_epoch=self.lr_patience
+            print(' *', end='')
+        else:
+            self.patience_epoch-=1
+            if self.patience_epoch <= 0:
+                self.e_lr_epoch/=self.lr_factor
+                print(' lr={:.1e}'.format(self.e_lr_epoch), end='')
+                if self.e_lr_epoch < self.lr_min:
+                    print()
                 self.patience_epoch=self.lr_patience
-                print(' *', end='')
-            else:
-                self.patience_epoch-=1
-                if self.patience_epoch <= 0:
-                    self.e_lr_epoch/=self.lr_factor
-                    print(' lr={:.1e}'.format(self.e_lr_epoch), end='')
-                    if self.e_lr_epoch < self.lr_min:
-                        print()
-                    self.patience_epoch=self.lr_patience
-                    self.optimizer_S=self.get_S_optimizer(task_id, self.e_lr_epoch)
+                self.optimizer_S=self.get_S_optimizer(task_id, self.e_lr_epoch)
 
-            if train_res['loss_a'] < self.best_loss_d:
-                self.best_loss_d=train_res['loss_a']
-                self.best_model_d=get_model(self.discriminator)
+        if train_res['loss_a'] < self.best_loss_d:
+            self.best_loss_d=train_res['loss_a']
+            self.best_model_d=self.get_model(self.discriminator)
+            self.patience_d_epoch=self.lr_patience
+        else:
+            self.patience_d_epoch-=1
+            if self.patience_d_epoch <= 0 and self.dis_lr_update:
+                self.d_lr_epoch/=self.lr_factor
+                print(' Dis lr={:.1e}'.format(self.d_lr_epoch))
+                if self.d_lr_epoch < self.lr_min:
+                    self.dis_lr_update=False
+                    print("Dis lr reached minimum value")
+                    print()
                 self.patience_d_epoch=self.lr_patience
-            else:
-                self.patience_d_epoch-=1
-                if self.patience_d_epoch <= 0 and self.dis_lr_update:
-                    self.d_lr_epoch/=self.lr_factor
-                    print(' Dis lr={:.1e}'.format(self.d_lr_epoch))
-                    if self.d_lr_epoch < self.lr_min:
-                        self.dis_lr_update=False
-                        print("Dis lr reached minimum value")
-                        print()
-                    self.patience_d_epoch=self.lr_patience
-                    self.optimizer_D=self.get_D_optimizer(task_id, self.d_lr_epoch)
-            print()
+                self.optimizer_D=self.get_D_optimizer(task_id, self.d_lr_epoch)
+        print()
     
-    def inference(self, data):
-        # TODO 考虑如何实现 inference，返回 output, acc
-        pass
+    def inference(self, data, task_id):
+        # 考虑如何实现 inference，返回 output, acc
+        test_model = self.load_model(task_id)
+        correct_t, num=0, 0
+
+        test_model.eval()
+        self.discriminator.eval()
+        
+        with torch.no_grad():
+            x, y, tt, td = data['image'], data['label'], data['tt'], data['td']
+            x.to(self.device)
+            y.to(self.device, dtype=torch.long)
+            tt=tt.to(self.device)
+            t_real_D=td.to(self.device)
+
+            output=test_model(x, x, tt, task_id)
+            _, pred=output.max(1)
+            correct_t+=pred.eq(y.view_as(pred)).sum().item()
+            num+=x.size(0)
+
+        return output, correct_t / num
 
     def eval_(self, dataloader, task_id):
         loss_a, loss_t, loss_d, loss_total=0, 0, 0, 0
@@ -488,7 +526,7 @@ class ACL(Finetune):
 
                 # Forward
                 output=self.model(x, x, tt, self.taskid)
-                shared_out, task_out=self.model.get_encoded_ftrs(x, x, self.taskid)
+                shared_out, task_out=self.model.get_encoded_ftrs(x, x, task_id)
                 _, pred=output.max(1)
                 correct_t+=pred.eq(y.view_as(pred)).sum().item()
 
@@ -523,6 +561,72 @@ class ACL(Finetune):
         res['size']=self.loader_size(dataloader)
 
         return res
+    
+    def get_parameters(self, config):
+        return self.model.get_parameters(config)
+
+    def report_tr(res, e, sbatch):
+        # Training performance
+        print(
+            '| Epoch {:3d} | Train losses={:.3f} | T: loss={:.3f}, acc={:5.2f}% | D: loss={:.3f}, acc={:5.1f}%, '
+            'Diff loss:{:.3f} |'.format(
+                e, res['loss_tot'],
+                res['loss_t'], res['acc_t'], res['loss_a'], res['acc_d'], res['loss_d']), end='')
+        
+    def report_val(res):
+        # Validation performance
+        print(' Valid losses={:.3f} | T: loss={:.6f}, acc={:5.2f}%, | D: loss={:.3f}, acc={:5.2f}%, Diff loss={:.3f} |'.format(
+            res['loss_tot'], res['loss_t'], res['acc_t'], res['loss_a'], res['acc_d'], res['loss_d']), end='')
+        
+    def get_model(model):
+        return deepcopy(model.state_dict())
+    
+    def save_all_models(self, task_id):
+        print("Saving all models for task {} ...".format(task_id+1))
+        dis=self.get_model(self.discriminator)
+        torch.save({'model_state_dict': dis,
+                    }, os.path.join(self.checkpoint, 'discriminator_{}.pth.tar'.format(task_id)))
+
+        model=self.get_model(self.model)
+        torch.save({'model_state_dict': model,
+                    }, os.path.join(self.checkpoint, 'model_{}.pth.tar'.format(task_id)))
+
+    def load_model(self, task_id):
+        # Load a previous model
+        net=Model(self.kwargs['ntasks'], self.kwargs['num_class'], self.kwargs['inputsize'], self.kwargs['latent_dim'], self.kwargs['head_units']).to(self.kwargs['device'])
+        checkpoint=torch.load(os.path.join(self.checkpoint, 'model_{}.pth.tar'.format(task_id)))
+        net.load_state_dict(checkpoint['model_state_dict'])
+
+        # Change the previous shared module with the current one
+        current_shared_module=deepcopy(self.model.shared.state_dict())
+        net.shared.load_state_dict(current_shared_module)
+
+        return net
+    
+    def load_checkpoint(self, task_id):     
+        print("Loading checkpoint for task {} ...".format(task_id))
+
+        # Load a prevoius model
+        net=Model(self.kwargs['ntasks'], self.kwargs['num_class'], self.kwargs['inputsize'], self.kwargs['latent_dim'], self.kwargs['head_units']).to(self.kwargs['device'])
+        checkpoint=torch.load(os.path.join(self.checkpoint, 'model_{}.pth.tar'.format(task_id)))
+        net.load_state_dict(checkpoint['model_state_dict'])
+
+        return net
+    
+    def prepare_model(self, task_id):
+        # Load a previous model and grab its shared module
+        old_net = self.load_checkpoint(task_id-1)
+        old_shared_module = old_net.shared.state_dict()
+
+        # Instantiate a new model and replace its shared module
+        model = Model(self.kwargs['ntasks'], self.kwargs['num_class'], self.kwargs['inputsize'], self.kwargs['latent_dim'], self.kwargs['head_units']).to(self.kwargs['device'])
+        model.shared.load_state_dict(old_shared_module)
+        model = model.to(self.device)
+
+        return model
+
+
+
 
 class DiffLoss(torch.nn.Module):
     # From: Domain Separation Networks (https://arxiv.org/abs/1608.06019)
@@ -542,20 +646,3 @@ class DiffLoss(torch.nn.Module):
 
         # return torch.mean((D1_norm.mm(D2_norm.t()).pow(2)))
         return torch.mean((D1_norm.mm(D2_norm.t()).pow(2)))
-    
-
-def report_tr(res, e, sbatch):
-    # Training performance
-    print(
-        '| Epoch {:3d} | Train losses={:.3f} | T: loss={:.3f}, acc={:5.2f}% | D: loss={:.3f}, acc={:5.1f}%, '
-        'Diff loss:{:.3f} |'.format(
-            e, res['loss_tot'],
-            res['loss_t'], res['acc_t'], res['loss_a'], res['acc_d'], res['loss_d']), end='')
-    
-def report_val(res):
-    # Validation performance
-    print(' Valid losses={:.3f} | T: loss={:.6f}, acc={:5.2f}%, | D: loss={:.3f}, acc={:5.2f}%, Diff loss={:.3f} |'.format(
-        res['loss_tot'], res['loss_t'], res['acc_t'], res['loss_a'], res['acc_d'], res['loss_d']), end='')
-    
-def get_model(model):
-    return deepcopy(model.state_dict())
