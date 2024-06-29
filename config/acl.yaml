@@ -21,6 +21,8 @@ device_ids: 0
 n_gpu: 1
 val_per_epoch: 5
 batch_size: 64
+init_epoch: 200
+inc_epoch: 200
 
 seed: 0
 deterministic: True
@@ -61,6 +63,8 @@ deterministic: True
 classifier:
   name: ACL
   kwargs: 
+    num_class: 5
+    feat_dim: 64 # 没有用到
     inputsize : [3,32,32]
     checkpoint: "./checkpoints/"  
 
@@ -93,4 +97,4 @@ classifier:
     nepochs: 200
     pc_valid: 0.15
 
-    device: "cuda:0"
+    device: "cuda:1"

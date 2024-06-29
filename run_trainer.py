@@ -17,10 +17,10 @@ def main(rank, config):
 if __name__ == "__main__":
     config = Config("./config/acl.yaml").get_config_dict()
 
-    print("config: ", config["classifier"]["kwargs"])
+    # print("config: ", config["classifier"]["kwargs"])
 
-    # if config["n_gpu"] > 1:
-    #     pass
-    #     os.environ["CUDA_VISIBLE_DEVICES"] = config["device_ids"]
-    # else:
-    #     main(0, config)
+    if config["n_gpu"] > 1:
+        pass
+        os.environ["CUDA_VISIBLE_DEVICES"] = config["device_ids"]
+    else:
+        main(0, config)

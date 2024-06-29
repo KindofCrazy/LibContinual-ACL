@@ -100,4 +100,34 @@ for epoch in range(self.config['num_epochs']):
     `__init__model()` 需要初始化模型，需要进行改写
  3. `acl.yaml` 需要与模型匹配
 
+## 2024.6.29
+
+```bash
+Traceback (most recent call last):
+  File "run_trainer.py", line 26, in <module>
+    main(0, config)
+  File "run_trainer.py", line 14, in main
+    trainer.train_loop()
+  File "/home/yangke/ACL/LibContinual-ACL/core/trainer.py", line 184, in train_loop
+    train_meter = self._train(epoch_idx, dataloader)
+  File "/home/yangke/ACL/LibContinual-ACL/core/trainer.py", line 227, in _train
+    output, acc, loss = self.model.observe(batch)
+  File "/home/yangke/ACL/LibContinual-ACL/core/model/acl.py", line 348, in observe
+    output = self.model(x, x_task_module, tt, self.task_id)
+  File "/home/yangke/anaconda3/envs/ACL/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1190, in _call_impl
+    return forward_call(*input, **kwargs)
+  File "/home/yangke/ACL/LibContinual-ACL/core/model/acl.py", line 127, in forward
+    shared_out = self.shared(x_s)
+  File "/home/yangke/anaconda3/envs/ACL/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1190, in _call_impl
+    return forward_call(*input, **kwargs)
+  File "/home/yangke/ACL/LibContinual-ACL/core/model/acl.py", line 44, in forward
+    h = self.maxpool(self.drop1(self.relu(self.conv1(x))))
+  File "/home/yangke/anaconda3/envs/ACL/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1190, in _call_impl
+    return forward_call(*input, **kwargs)
+  File "/home/yangke/anaconda3/envs/ACL/lib/python3.8/site-packages/torch/nn/modules/conv.py", line 463, in forward
+    return self._conv_forward(input, self.weight, self.bias)
+  File "/home/yangke/anaconda3/envs/ACL/lib/python3.8/site-packages/torch/nn/modules/conv.py", line 459, in _conv_forward
+    return F.conv2d(input, weight, bias, self.stride,
+RuntimeError: Input type (torch.FloatTensor) and weight type (torch.cuda.FloatTensor) should be the same or input should be a MKLDNN tensor and weight is a dense tensor
+```
 

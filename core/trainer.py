@@ -6,6 +6,7 @@ from time import time
 from tqdm import tqdm
 from core.data import get_dataloader
 from core.utils import init_seed, AverageMeter, get_instance, GradualWarmupScheduler, count_parameters
+from core.model.acl import ACL
 import core.model as arch
 from torch.utils.data import DataLoader
 import numpy as np
@@ -48,13 +49,9 @@ class Trainer(object):
         
 
         self.train_meter, self.test_meter = self._init_meter()
-
+        self.buffer=None # 不使用buffer
         self.val_per_epoch = config['val_per_epoch']
-
-        
-        if self.config["classifier"]["name"] == "bic":
-            self.stage2_epoch = config['stage2_epoch']
-
+        self.init_epoch, self.inc_epoch = config['init_epoch'], config['inc_epoch']
 
     def _init_logger(self, config, mode='train'):
         '''
@@ -139,12 +136,9 @@ class Trainer(object):
         """
         # 需要加载ACL模型，需要修改，舍弃原有的模型加载方式
         #backbone = get_instance(arch, "backbone", config)
-        dic = {"device": self.device}
-
-        model = get_instance(arch, "classifier", config, **dic)
-        #print(backbone)
-        print("Trainable params in the model: {}".format(count_parameters(model)))
-
+        kwargs = config['classifier']['kwargs'] 
+        # print(kwargs)
+        model = ACL(**kwargs)
         model = model.to(self.device)
         return model
     
@@ -173,7 +167,7 @@ class Trainer(object):
         for task_idx in range(self.task_num):
             self.task_idx = task_idx
             print("================Task {} Start!================".format(task_idx))
-            self.buffer.total_classes += self.init_cls_num if task_idx == 0 else self.inc_cls_num
+            #self.buffer.total_classes += self.init_cls_num if task_idx == 0 else self.inc_cls_num
             if hasattr(self.model, 'before_task'):
                 self.model.before_task(task_idx, self.buffer, self.train_loader.get_loader(task_idx), self.test_loader.get_loader(task_idx))
 
@@ -185,7 +179,7 @@ class Trainer(object):
             best_acc = 0.
             for epoch_idx in range(self.init_epoch if task_idx == 0 else self.inc_epoch):
 
-                print("learning rate: {}".format(self.scheduler.get_last_lr()))
+                #print("learning rate: {}".format(self.scheduler.get_last_lr()))
                 print("================ Train on the train set ================")
                 train_meter = self._train(epoch_idx, dataloader)
                 print("Epoch [{}/{}] |\tLoss: {:.4f} \tAverage Acc: {:.2f} ".format(epoch_idx, self.init_epoch if task_idx == 0 else self.inc_epoch, train_meter.avg('loss'), train_meter.avg("acc1")))
@@ -225,7 +219,6 @@ class Trainer(object):
         """
         # 每个`epoch`训练。在 `model.observe()` 内部进行参数更新，仅返回损失与准确率。
         self.model.train()
-        self.discriminator.train()
         meter = deepcopy(self.train_meter)
         meter.reset()
 

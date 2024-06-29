@@ -2,7 +2,7 @@ import imp
 import os
 import random
 from tabnanny import check
-from cv2 import threshold
+#from cv2 import threshold
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -51,7 +51,7 @@ class Shared(nn.Module):
         h = self.drop2(self.relu(self.fc4(h)))
         return h
     
-    def compute_conv_output_size(Lin,kernel_size,stride=1,padding=0,dilation=1):
+    def compute_conv_output_size(self, Lin,kernel_size,stride=1,padding=0,dilation=1):
         return int(np.floor((Lin+2*padding-dilation*(kernel_size-1)-1)/float(stride)+1))
 
 class Private(nn.Module):
@@ -217,9 +217,10 @@ class ACL(Finetune):
     # 舍弃 backbone 操作
     # feat_dim 舍弃算了，注意调用时此处为None
     def __init__(self, feat_dim, num_class, **kwargs):
+        super(ACL, self).__init__(backbone=None, feat_dim=feat_dim, num_class=num_class, **kwargs)
         self.kwargs = kwargs
-        self.npochs = kwargs['npochs']
-        self.sbatch = kwargs['sbatch']
+        self.nepochs = kwargs['nepochs']
+        self.sbatch = kwargs['batch_size']
         
         self.model = Model(kwargs['ntasks'], num_class, kwargs['inputsize'], kwargs['latent_dim'], kwargs['head_units']).to(kwargs['device'])
 
@@ -375,16 +376,12 @@ class ACL(Finetune):
             shared_encoded, task_out=self.model.get_encoded_ftrs(x, x_task_module, self.task_id)
             dis_real_out=self.discriminator.forward(shared_encoded.detach(), t_real_D, self.task_id)
             dis_real_loss=self.adversarial_loss_d(dis_real_out, t_real_D)
-            if self.args.experiment == 'miniimagenet':
-                dis_real_loss*=self.adv_loss_reg
             dis_real_loss.backward(retain_graph=True)
 
             # training discriminator on fake data
             z_fake=torch.as_tensor(np.random.normal(self.mu, self.sigma, (x.size(0), self.latent_dim)),dtype=torch.float32, device=self.device)
             dis_fake_out=self.discriminator.forward(z_fake, t_real_D, self.task_id)
             dis_fake_loss=self.adversarial_loss_d(dis_fake_out, t_fake_D)
-            if self.args.experiment == 'miniimagenet':
-                dis_fake_loss*=self.adv_loss_reg
             dis_fake_loss.backward(retain_graph=True)
 
             self.optimizer_D.step()    
@@ -565,7 +562,7 @@ class ACL(Finetune):
     def get_parameters(self, config):
         return self.model.get_parameters(config)
 
-    def report_tr(res, e, sbatch):
+    def report_tr(self, res, e, sbatch):
         # Training performance
         print(
             '| Epoch {:3d} | Train losses={:.3f} | T: loss={:.3f}, acc={:5.2f}% | D: loss={:.3f}, acc={:5.1f}%, '
@@ -573,12 +570,12 @@ class ACL(Finetune):
                 e, res['loss_tot'],
                 res['loss_t'], res['acc_t'], res['loss_a'], res['acc_d'], res['loss_d']), end='')
         
-    def report_val(res):
+    def report_val(self, res):
         # Validation performance
         print(' Valid losses={:.3f} | T: loss={:.6f}, acc={:5.2f}%, | D: loss={:.3f}, acc={:5.2f}%, Diff loss={:.3f} |'.format(
             res['loss_tot'], res['loss_t'], res['acc_t'], res['loss_a'], res['acc_d'], res['loss_d']), end='')
         
-    def get_model(model):
+    def get_model(self, model):
         return deepcopy(model.state_dict())
     
     def save_all_models(self, task_id):
