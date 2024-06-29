@@ -8,6 +8,7 @@ includes:
 data_root: ../dataset/cifar100
 image_size: 32
 save_path: ./
+
 # data
 init_cls_num: 5
 inc_cls_num: 5
@@ -19,23 +20,25 @@ epoch: 200
 device_ids: 0
 n_gpu: 1
 val_per_epoch: 5
-
 batch_size: 64
 
-# TODO optimizer 加载方式需要修改，对model和discriminator分别加载
-optimizer:
-  name: SGD
-  kwargs:
-    lr: 0.1
-    momentum: 0.9
-    weight_decay: 0.0005
+seed: 0
+deterministic: True
 
-# TODO schediler 需要用自定义的方式
-lr_scheduler:
-  name: MultiStepLR
-  kwargs:
-    gamma: 0.1
-    milestones: [80, 120]
+# optimizer 加载方式需要修改，对model和discriminator分别加载
+# optimizer:
+#   name: SGD
+#   kwargs:
+#     lr: 0.1
+#     momentum: 0.9
+#     weight_decay: 0.0005
+
+# schediler 需要用自定义的方式
+# lr_scheduler:
+#   name: MultiStepLR
+#   kwargs:
+#     gamma: 0.1
+#     milestones: [80, 120]
 
 # 暂时启用 backbone 选项
 # backbone:
@@ -54,11 +57,12 @@ lr_scheduler:
 #     batch_size: 128
 #     strategy: herding     # random, equal_random, reservoir, herding
 
-# TODO 制定model和discriminator的参数
+# 制定model和discriminator的参数
 classifier:
   name: ACL
   kwargs: 
     inputsize : [3,32,32]
+    checkpoint: "./checkpoints/"  
 
     diff: "yes"
     lam: 1        #diff loss lambda
