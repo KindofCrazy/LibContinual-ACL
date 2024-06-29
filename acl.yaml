@@ -1,0 +1,96 @@
+includes:
+  - headers/data.yaml
+  - headers/device.yaml
+  - headers/model.yaml
+  # - headers/optimizer.yaml
+  - backbones/resnet12.yaml
+
+data_root: ../dataset/cifar100
+image_size: 32
+save_path: ./
+
+# data
+init_cls_num: 5
+inc_cls_num: 5
+task_num: 20
+
+###########
+
+epoch: 200
+device_ids: 0
+n_gpu: 1
+val_per_epoch: 5
+batch_size: 64
+
+seed: 0
+deterministic: True
+
+# optimizer 加载方式需要修改，对model和discriminator分别加载
+# optimizer:
+#   name: SGD
+#   kwargs:
+#     lr: 0.1
+#     momentum: 0.9
+#     weight_decay: 0.0005
+
+# schediler 需要用自定义的方式
+# lr_scheduler:
+#   name: MultiStepLR
+#   kwargs:
+#     gamma: 0.1
+#     milestones: [80, 120]
+
+# 暂时启用 backbone 选项
+# backbone:
+#   name: resnet32_V2
+#   kwargs:
+#     num_classes: 100
+#     args: 
+#       dataset: cifar100
+
+
+# 暂时启用 buffer 选项
+# buffer:
+#   name: LinearBuffer
+#   kwargs:
+#     buffer_size: 2000
+#     batch_size: 128
+#     strategy: herding     # random, equal_random, reservoir, herding
+
+# 制定model和discriminator的参数
+classifier:
+  name: ACL
+  kwargs: 
+    inputsize : [3,32,32]
+    checkpoint: "./checkpoints/"  
+
+    diff: "yes"
+    lam: 1        #diff loss lambda
+    adv: 0.05     #adversarial loss regularizer
+    orth: 0.1     #diff loss regularizer
+
+    ntasks: 20
+
+    e_lr: 0.01
+    e_wd: 0.01
+    s_step: 5
+
+    d_lr: 0.001
+    d_wd: 0.01
+    d_step: 1
+
+    lr_factor: 3
+    lr_min: 1.0e-06
+    lr_patience: 5
+    mom: 0.9
+
+    nlayers: 2
+    units: 175
+    head_units: 32
+    latent_dim: 128
+
+    batch_size: 64
+    nepochs: 200
+    pc_valid: 0.15
+
+    device: "cuda:0"
