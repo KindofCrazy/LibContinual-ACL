@@ -16,8 +16,8 @@ task_num: 20
 
 ###########
 
-epoch: 200
-device_ids: 0
+epoch: 0
+device_ids: 1 # 和kwargs中的device对应
 n_gpu: 1
 val_per_epoch: 5
 batch_size: 64

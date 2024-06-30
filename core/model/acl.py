@@ -221,6 +221,8 @@ class ACL(Finetune):
         self.kwargs = kwargs
         self.nepochs = kwargs['nepochs']
         self.sbatch = kwargs['batch_size']
+        self.feat_dim = feat_dim
+        self.num_class = num_class
         
         self.model = Model(kwargs['ntasks'], num_class, kwargs['inputsize'], kwargs['latent_dim'], kwargs['head_units']).to(kwargs['device'])
 
@@ -312,14 +314,15 @@ class ACL(Finetune):
         self.optimizer_S=self.get_S_optimizer(task_id, self.e_lr_epoch)
 
     def observe(self, data):
+        # return 0,0,0
         # 面对一个batch的数据，需要进行对抗训练。Train Shared Module and Train Discriminator
         # `tt` 与 `td` 的意义
         self.model.train()
         self.discriminator.train()
 
         x, y, tt, td = data['image'], data['label'], data['tt'], data['td']
-        x.to(self.device)
-        y.to(self.device, dtype=torch.long)
+        x=x.to(self.device)
+        y=y.to(self.device, dtype=torch.long)
         tt=tt.to(self.device)
         
         # Detaching samples in the batch which do not belong to the current task before feeding them to P
@@ -344,13 +347,14 @@ class ACL(Finetune):
         for s_step in range(self.s_steps):
             self.optimizer_S.zero_grad()
             self.model.zero_grad()
-
+            # print(x.get_device(), x_task_module.get_device(), tt.get_device(), y.get_device())
+            
             output = self.model(x, x_task_module, tt, self.task_id)
             task_loss = self.task_loss(output, y)
-
+            
             shared_encoded, task_encoded=self.model.get_encoded_ftrs(x, x_task_module, self.task_id)
-            dis_out_gen_training=self.discriminator(shared_encoded, y, self.task_id)
-            adv_loss=self.adversarial_loss_s(dis_out_gen_training, y)
+            dis_out_gen_training=self.discriminator.forward(shared_encoded, t_real_D, self.task_id)
+            adv_loss=self.adversarial_loss_s(dis_out_gen_training, t_real_D)
 
             if self.diff=="yes":
                 diff_loss=self.diff_loss(shared_encoded, task_encoded)
@@ -373,6 +377,7 @@ class ACL(Finetune):
 
             # training discriminator on real data
             output=self.model(x, x_task_module, tt, self.task_id)
+            
             shared_encoded, task_out=self.model.get_encoded_ftrs(x, x_task_module, self.task_id)
             dis_real_out=self.discriminator.forward(shared_encoded.detach(), t_real_D, self.task_id)
             dis_real_loss=self.adversarial_loss_d(dis_real_out, t_real_D)
@@ -387,6 +392,7 @@ class ACL(Finetune):
             self.optimizer_D.step()    
 
         # 以下是要返回的 output, total_loss, acc
+        # test_print()
         self.model.eval()
         self.discriminator.eval()
         with torch.no_grad():
@@ -394,8 +400,8 @@ class ACL(Finetune):
             
             task_loss = self.task_loss(output, y)
             shared_encoded, task_encoded=self.model.get_encoded_ftrs(x, x_task_module, self.task_id)
-            dis_out_gen_training=self.discriminator(shared_encoded, y, self.task_id)
-            adv_loss=self.adversarial_loss_s(dis_out_gen_training, y)
+            dis_out_gen_training=self.discriminator(shared_encoded, t_real_D, self.task_id)
+            adv_loss=self.adversarial_loss_s(dis_out_gen_training, t_real_D)
             if self.diff=="yes":
                 diff_loss=self.diff_loss(shared_encoded, task_encoded)
             else:
@@ -404,9 +410,11 @@ class ACL(Finetune):
             total_loss=task_loss + self.adv_loss_reg * adv_loss + self.diff_loss_reg * diff_loss
             
             _, pred=output.max(1)
-            acc = pred.eq(y.view_as(pred)).sum().item() / y.size(0)
-
-        return output, total_loss, acc
+            acc = pred.eq(y.view_as(pred)).sum().item() / x.size(0)
+            # print(acc)
+            # print(pred.eq(y.view_as(pred)).size(), y.size(0))
+        
+        return output, acc, total_loss
 
     def after_task(self, task_id, buffer, train_loader, test_loaders):
         # 保存模型
@@ -446,7 +454,7 @@ class ACL(Finetune):
 
 
         # Valid
-        valid_res=self.eval_(test_loader, task_id)
+        valid_res=self.eval_(test_loader[-1], task_id)
         self.report_val(valid_res)
 
         # Adapt lr for S and D
@@ -484,7 +492,7 @@ class ACL(Finetune):
     
     def inference(self, data, task_id):
         # 考虑如何实现 inference，返回 output, acc
-        test_model = self.load_model(task_id)
+        test_model = self.load_model(task_id) if task_id > 0 else self.model
         correct_t, num=0, 0
 
         test_model.eval()
@@ -492,8 +500,8 @@ class ACL(Finetune):
         
         with torch.no_grad():
             x, y, tt, td = data['image'], data['label'], data['tt'], data['td']
-            x.to(self.device)
-            y.to(self.device, dtype=torch.long)
+            x=x.to(self.device)
+            y=y.to(self.device, dtype=torch.long)
             tt=tt.to(self.device)
             t_real_D=td.to(self.device)
 
@@ -515,14 +523,15 @@ class ACL(Finetune):
 
         res={}
         with torch.no_grad():
-            for batch, (data, target, tt, td) in enumerate(dataloader):
-                x=data.to(device=self.device)
-                y=target.to(device=self.device, dtype=torch.long)
-                tt=tt.to(device=self.device)
-                t_real_D=td.to(self.device)
+            for batch, data in enumerate(dataloader):
+                # print(data.keys())
+                x=data['image'].to(self.device)
+                y=data['label'].to(self.device, dtype=torch.long)
+                tt=data['tt'].to(self.device)
+                t_real_D=data['td'].to(self.device)
 
                 # Forward
-                output=self.model(x, x, tt, self.taskid)
+                output=self.model(x, x, tt, self.task_id)
                 shared_out, task_out=self.model.get_encoded_ftrs(x, x, task_id)
                 _, pred=output.max(1)
                 correct_t+=pred.eq(y.view_as(pred)).sum().item()
@@ -555,7 +564,6 @@ class ACL(Finetune):
         res['loss_a'], res['acc_d']=loss_a.item() / (batch + 1), 100 * correct_d / num
         res['loss_d']=loss_d.item() / (batch + 1)
         res['loss_tot']=loss_total.item() / (batch + 1)
-        res['size']=self.loader_size(dataloader)
 
         return res
     
@@ -590,7 +598,8 @@ class ACL(Finetune):
 
     def load_model(self, task_id):
         # Load a previous model
-        net=Model(self.kwargs['ntasks'], self.kwargs['num_class'], self.kwargs['inputsize'], self.kwargs['latent_dim'], self.kwargs['head_units']).to(self.kwargs['device'])
+        # print(self.kwargs)
+        net=Model(self.kwargs['ntasks'], self.num_class, self.kwargs['inputsize'], self.kwargs['latent_dim'], self.kwargs['head_units']).to(self.kwargs['device'])
         checkpoint=torch.load(os.path.join(self.checkpoint, 'model_{}.pth.tar'.format(task_id)))
         net.load_state_dict(checkpoint['model_state_dict'])
 
@@ -604,7 +613,7 @@ class ACL(Finetune):
         print("Loading checkpoint for task {} ...".format(task_id))
 
         # Load a prevoius model
-        net=Model(self.kwargs['ntasks'], self.kwargs['num_class'], self.kwargs['inputsize'], self.kwargs['latent_dim'], self.kwargs['head_units']).to(self.kwargs['device'])
+        net=Model(self.kwargs['ntasks'], self.num_class, self.kwargs['inputsize'], self.kwargs['latent_dim'], self.kwargs['head_units']).to(self.kwargs['device'])
         checkpoint=torch.load(os.path.join(self.checkpoint, 'model_{}.pth.tar'.format(task_id)))
         net.load_state_dict(checkpoint['model_state_dict'])
 
@@ -616,7 +625,7 @@ class ACL(Finetune):
         old_shared_module = old_net.shared.state_dict()
 
         # Instantiate a new model and replace its shared module
-        model = Model(self.kwargs['ntasks'], self.kwargs['num_class'], self.kwargs['inputsize'], self.kwargs['latent_dim'], self.kwargs['head_units']).to(self.kwargs['device'])
+        model = Model(self.kwargs['ntasks'], self.num_class, self.kwargs['inputsize'], self.kwargs['latent_dim'], self.kwargs['head_units']).to(self.kwargs['device'])
         model.shared.load_state_dict(old_shared_module)
         model = model.to(self.device)
 
@@ -643,3 +652,8 @@ class DiffLoss(torch.nn.Module):
 
         # return torch.mean((D1_norm.mm(D2_norm.t()).pow(2)))
         return torch.mean((D1_norm.mm(D2_norm.t()).pow(2)))
+
+
+def test_print():
+    print("Test print")
+    return True

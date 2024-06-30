@@ -187,3 +187,12 @@ def fmt_date_str(date=None, fmt="%y-%m-%d-%H-%M-%S"):
         date = datetime.now()
     return date.strftime(fmt)
 
+def clear_checkpoints(checkpoint_dir):
+    """
+    Clear checkpoints in checkpoint_dir
+
+    Args:
+        checkpoint_dir (str): Checkpoint dir.
+    """
+    for f in os.listdir(checkpoint_dir):
+        os.remove(os.path.join(checkpoint_dir, f))
