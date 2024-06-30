@@ -492,7 +492,7 @@ class ACL(Finetune):
     
     def inference(self, data, task_id):
         # 考虑如何实现 inference，返回 output, acc
-        test_model = self.load_model(task_id) if task_id > 0 else self.model
+        test_model = self.load_model(task_id) if self.task_id > 0 else self.model
         correct_t, num=0, 0
 
         test_model.eval()
