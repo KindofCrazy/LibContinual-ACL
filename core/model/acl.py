@@ -384,7 +384,7 @@ class ACL(Finetune):
             dis_real_loss.backward(retain_graph=True)
 
             # training discriminator on fake data
-            z_fake=torch.as_tensor(np.random.normal(self.mu, self.sigma, (x.size(0), self.latent_dim)),dtype=torch.float32, device=self.device)
+            z_fake=torch.as_tensor(np.random.normal(self.mu, self.sigma, (x.size(0), self.latent_dim)), dtype=torch.float32, device=self.device)
             dis_fake_out=self.discriminator.forward(z_fake, t_real_D, self.task_id)
             dis_fake_loss=self.adversarial_loss_d(dis_fake_out, t_fake_D)
             dis_fake_loss.backward(retain_graph=True)
@@ -492,7 +492,7 @@ class ACL(Finetune):
     
     def inference(self, data, task_id):
         # 考虑如何实现 inference，返回 output, acc
-        test_model = self.load_model(task_id) if self.task_id > 0 else self.model
+        test_model = self.load_model(task_id) if task_id < self.task_id else self.model
         correct_t, num=0, 0
 
         test_model.eval()

@@ -21,8 +21,8 @@ device_ids: 1 # 和kwargs中的device对应
 n_gpu: 1
 val_per_epoch: 5
 batch_size: 64
-init_epoch: 200
-inc_epoch: 200
+init_epoch: 30
+inc_epoch: 30
 
 seed: 0
 deterministic: True
@@ -94,7 +94,7 @@ classifier:
     latent_dim: 128
 
     batch_size: 64
-    nepochs: 200
+    nepochs: 30
     pc_valid: 0.15
 
     device: "cuda:1"
