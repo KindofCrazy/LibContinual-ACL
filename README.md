@@ -36,5 +36,5 @@ The training process is documented in the file `log.txt`
 | :------: | :--------: | :--------: | :---------: | :----: | :---------: | :---------: |
 | AlexNet-ACL |   3x32x32    |    64     |    0     |  30   |      20      |    77.73    |
 
-The ultimate accuracy for 20 tasks is below:
+The accuracies for 20 tasks are shown below:
 ![ACL](./reproduce/acl/result.jpg)
