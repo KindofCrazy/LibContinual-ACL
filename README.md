@@ -1,23 +1,40 @@
-## 实验任务
-Implement [ACL](https://github.com/facebookresearch/Adversarial-Continual-Learning) under [LibContinual](https://github.com/RL-VIG/LibContinual).
+# Adversarial Continual Learning [(ECCV'2020)](https://arxiv.org/abs/2003.09553)
 
-## 代码环境
-我所使用的`conda`环境见 [njubox](https://box.nju.edu.cn/d/1acf2a8440c94731a9ab/) 。
+## Abstract
 
-**Note**:与`LibContinual`与`ACL`的文档中要求有所不同，为了能在`A800`上运行改变了`torch`,`torchvision`,`cuDNN`的版本。
+Continual learning aims to learn new tasks without forgetting previously learned ones. We hypothesize that representations learned to solve each task in a sequence have a shared structure while containing some task-specific properties. We show that shared features are significantly less prone to forgetting and propose a novel hybrid continual learning framework that learns a disjoint representation for task-invariant and task-specific features required to solve a sequence of tasks. Our model combines architecture growth to prevent forgetting of task-specific skills and an experience replay approach to preserve shared skills. We demonstrate our hybrid approach is effective in avoiding forgetting and show it is superior to both architecture-based and memory-based approaches on class incrementally learning of a single dataset as well as a sequence of multiple datasets in image classification. Our code is available at https://github.com/facebookresearch/Adversarial-Continual-Learning.
 
-- Python: 3.8.0
+![ACL](./resources/imgs/acl.png)
 
-## 数据集
-`CIFAR100`存放位置: `/dataset/cifar100`，将`CIFAR100`分成20个任务，每个任务包含5个类别。
+## Citation
 
-`CIFAR100` 数据集见 [Google Drive](https://drive.google.com/drive/folders/1EL46LQ3ww-F1NVTwFDPIg-nO198cUqWm) 。
+```bibtex
+@article{ebrahimi2020adversarial,
+  title={Adversarial Continual Learning},
+  author={Ebrahimi, Sayna and Meier, Franziska and Calandra, Roberto and Darrell, Trevor and Rohrbach, Marcus},
+  journal={arXiv preprint arXiv:2003.09553},
+  year={2020}
+}
+```
 
-## 代码运行(理论流程，未经过测验)
+## How to Reproduce ACL
 
-- **Step1**: 修改`run_trainer.py`中`Config`参数为`./config/acl.yaml`
-- **Step2**：配置`./config/acl.yaml`文件中的参数
-    - `data_root`: 数据集路径
-    - `save_path`: 日志保存路径
-- **Step3**: 运行代码`python run_trainer.py`
-- **Step4**：日志保存在配置文件中`save_path`路径下
+- **Step1: Set the path in `run_trainer.py` with `./config/acl.yaml`**
+    ```python
+    config = Config("./config/acl.yaml").get_config_dict()
+    ```
+- **Step2: Run command**
+    ```python
+    python run_trainer.py
+    ```
+
+## Results on CIFAR-100 dataset
+
+The training process is documented in the file `log.txt`
+
+|   Arch   | Input Size | Batch Size | Buffer Size | Epochs | Task Number | Average ACC |
+| :------: | :--------: | :--------: | :---------: | :----: | :---------: | :---------: |
+| AlexNet-ACL |   3x32x32    |    64     |    0     |  30   |      20      |    77.73    |
+
+The ultimate accuracy for 20 tasks is below:
+![ACL](./reproduce/acl/result.jpg)

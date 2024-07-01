@@ -34,7 +34,7 @@ Continual learning aims to learn new tasks without forgetting previously learned
 
 |   Arch   | Input Size | Batch Size | Buffer Size | Epochs | Task Number | Average ACC |
 | :------: | :--------: | :--------: | :---------: | :----: | :---------: | :---------: |
-| AlecNet-ACL |   3x32x32    |    64     |    0     |  200   |      20      |    #TODO    |
+| AlecNet-ACL |   3x32x32    |    64     |    0     |  30   |      20      |    77.73    |
 
 The ultimate accuracy for 20 tasks is below:
-#TODO
+![ACL](result.jpg)
